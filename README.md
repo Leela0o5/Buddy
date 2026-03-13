@@ -1,4 +1,4 @@
-# buddy
+# Buddy
 
 A new Flutter project.
 
