@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'core/services/hive_service.dart';
 import 'app.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // Later Tasks:
-  // 1. Initialize Hive 
-  // 2. Initialize local notifications 
+
+  // Initialize Hive for local storage
+  await HiveService().initialize();
+
+  // Initialize local notifications later
 
   runApp(
     const ProviderScope(
