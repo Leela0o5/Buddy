@@ -26,7 +26,7 @@ ThemeData createLightTheme() {
   return ThemeData(
     useMaterial3: true,
     brightness: Brightness.light,
-    colorScheme: ColorScheme.light(
+    colorScheme: const ColorScheme.light(
       primary: ADHDColorPalette.primaryBlue,
       onPrimary: Colors.white,
       secondary: ADHDColorPalette.primaryGreen,
@@ -41,12 +41,12 @@ ThemeData createLightTheme() {
     scaffoldBackgroundColor: Colors.white,
     
     // AppBar styling
-    appBarTheme: AppBarTheme(
+    appBarTheme: const AppBarTheme(
       backgroundColor: ADHDColorPalette.primaryBlue,
       foregroundColor: Colors.white,
       elevation: 0,
       centerTitle: true,
-      titleTextStyle: const TextStyle(
+      titleTextStyle: TextStyle(
         fontSize: 22,
         fontWeight: FontWeight.w600,
         color: Colors.white,
@@ -168,33 +168,33 @@ ThemeData createDarkTheme() {
   return ThemeData(
     useMaterial3: true,
     brightness: Brightness.dark,
-    colorScheme: ColorScheme.dark(
+    colorScheme: const ColorScheme.dark(
       primary: ADHDColorPalette.primaryBlue,
       onPrimary: Colors.white,
       secondary: ADHDColorPalette.primaryGreen,
       onSecondary: Colors.white,
       tertiary: ADHDColorPalette.accentOrange,
       onTertiary: Colors.white,
-      surface: const Color(0xFF1A1A1A),
-      onSurface: const Color(0xFFE0E0E0),
+      surface: Color(0xFF1A1A1A),
+      onSurface: Color(0xFFE0E0E0),
       error: ADHDColorPalette.errorRed,
       onError: Colors.white,
     ),
     scaffoldBackgroundColor: const Color(0xFF121212),
     
     // AppBar styling
-    appBarTheme: AppBarTheme(
+    appBarTheme: const AppBarTheme(
       backgroundColor: ADHDColorPalette.primaryBlue,
       foregroundColor: Colors.white,
       elevation: 0,
       centerTitle: true,
-      titleTextStyle: const TextStyle(
+      titleTextStyle: TextStyle(
         fontSize: 22,
         fontWeight: FontWeight.w600,
         color: Colors.white,
       ),
     ),
-    
+
     // Button styling
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
@@ -226,11 +226,11 @@ ThemeData createDarkTheme() {
     ),
     
     // Card styling
-    cardTheme: CardTheme(
-      color: const Color(0xFF1E1E1E),
+    cardTheme: const CardTheme(
+      color: Color(0xFF1E1E1E),
       elevation: 0,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.all(Radius.circular(12)),
       ),
     ),
     

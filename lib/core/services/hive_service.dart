@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import '../../config/constants.dart';
 
@@ -20,9 +21,9 @@ class HiveService {
       // Open all boxes
       await _openBoxes();
 
-      print('Hive initialized successfully');
+      debugPrint('Hive initialized successfully');
     } catch (e) {
-      print('Error initializing Hive: $e');
+      debugPrint('Error initializing Hive: $e');
       rethrow;
     }
   }
@@ -35,9 +36,9 @@ class HiveService {
       await Hive.openBox<dynamic>(AppConstants.reflectionsBox);
       await Hive.openBox<dynamic>(AppConstants.preferencesBox);
 
-      print('All Hive boxes opened');
+      debugPrint('All Hive boxes opened');
     } catch (e) {
-      print('Error opening boxes: $e');
+      debugPrint('Error opening boxes: $e');
       rethrow;
     }
   }
@@ -47,7 +48,7 @@ class HiveService {
     try {
       return Hive.box(boxName);
     } catch (e) {
-      print('Error getting box $boxName: $e');
+      debugPrint('Error getting box $boxName: $e');
       rethrow;
     }
   }
@@ -56,9 +57,9 @@ class HiveService {
   Future<void> closeAllBoxes() async {
     try {
       await Hive.close();
-      print('All Hive boxes closed');
+      debugPrint('All Hive boxes closed');
     } catch (e) {
-      print('Error closing boxes: $e');
+      debugPrint('Error closing boxes: $e');
     }
   }
 
@@ -77,9 +78,9 @@ class HiveService {
         prefs.clear(),
       ]);
 
-      print('All boxes cleared');
+      debugPrint('All boxes cleared');
     } catch (e) {
-      print('Error clearing boxes: $e');
+      debugPrint('Error clearing boxes: $e');
     }
   }
 }
