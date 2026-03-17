@@ -1,20 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/widgets/base_scaffold.dart';
 import '../../../../config/constants.dart';
+import '../state/timer_provider.dart';
 
 // Home screen with focus timer selector and quick stats
-class HomeScreen extends StatefulWidget {
+class HomeScreen extends ConsumerWidget {
   const HomeScreen({Key? key}) : super(key: key);
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
-}
+  Widget build(BuildContext context, WidgetRef ref) {
+    final selectedDuration = ref.watch(selectedDurationProvider);
+    final todayCount = ref.watch(todayCompletedCountProvider);
+    final streak = ref.watch(currentStreakProvider);
 
-class _HomeScreenState extends State<HomeScreen> {
-  int _selectedDuration = AppConstants.normalFocus; // 15 min default
-
-  @override
-  Widget build(BuildContext context) {
     return BaseScaffold(
       title: AppStrings.homeTab,
       body: SingleChildScrollView(
@@ -22,19 +21,19 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           children: [
             // Large circular timer placeholder
-            _buildTimerPlaceholder(context),
+            _buildTimerPlaceholder(context, selectedDuration),
             const SizedBox(height: 40),
 
             // Session duration selector
-            _buildDurationSelector(context),
+            _buildDurationSelector(context, ref, selectedDuration),
             const SizedBox(height: 40),
 
             // Start Focus button
-            _buildStartButtons(context),
+            _buildStartButtons(context, ref, selectedDuration),
             const SizedBox(height: 40),
 
             // Quick stats
-            _buildQuickStats(context),
+            _buildQuickStats(context, todayCount, streak),
           ],
         ),
       ),
@@ -42,7 +41,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // Large circular timer display placeholder
-  Widget _buildTimerPlaceholder(BuildContext context) {
+  Widget _buildTimerPlaceholder(BuildContext context, int duration) {
     return Center(
       child: Container(
         width: 220,
@@ -60,7 +59,7 @@ class _HomeScreenState extends State<HomeScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Text(
-                '$_selectedDuration:00',
+                '$duration:00',
                 style: Theme.of(context).textTheme.displayLarge?.copyWith(
                       fontWeight: FontWeight.bold,
                       color: Theme.of(context).colorScheme.primary,
@@ -79,7 +78,11 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // Session duration selector buttons
-  Widget _buildDurationSelector(BuildContext context) {
+  Widget _buildDurationSelector(
+    BuildContext context,
+    WidgetRef ref,
+    int selectedDuration,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -92,14 +95,12 @@ class _HomeScreenState extends State<HomeScreen> {
           spacing: 8,
           runSpacing: 8,
           children: AppConstants.allSessionDurations.map((duration) {
-            final isSelected = _selectedDuration == duration;
+            final isSelected = selectedDuration == duration;
             return ChoiceChip(
               label: Text('${duration}m'),
               selected: isSelected,
               onSelected: (selected) {
-                setState(() {
-                  _selectedDuration = duration;
-                });
+                ref.read(selectedDurationProvider.notifier).state = duration;
               },
             );
           }).toList(),
@@ -109,7 +110,11 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // Start buttons (normal + start small mode)
-  Widget _buildStartButtons(BuildContext context) {
+  Widget _buildStartButtons(
+    BuildContext context,
+    WidgetRef ref,
+    int selectedDuration,
+  ) {
     return Column(
       children: [
         // Main start button
@@ -118,10 +123,14 @@ class _HomeScreenState extends State<HomeScreen> {
           height: AppConstants.largeButtonHeight,
           child: FilledButton.icon(
             onPressed: () {
-
+              // Start session with selected duration
+              ref.read(currentSessionProvider.notifier).startSession(selectedDuration);
+              ref.read(timerServiceProvider).start(selectedDuration * 60);
+              
+              // TODO: Navigate to timer screen (Day 4)
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text('Starting $_selectedDuration min session...'),
+                  content: Text('Starting $selectedDuration min session...'),
                 ),
               );
             },
@@ -136,6 +145,10 @@ class _HomeScreenState extends State<HomeScreen> {
           height: AppConstants.largeButtonHeight,
           child: OutlinedButton.icon(
             onPressed: () {
+              // Start 5-min quick session
+              ref.read(currentSessionProvider.notifier).startSession(5);
+              ref.read(timerServiceProvider).start(5 * 60);
+              
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
                   content: Text('Starting 5 min quick session...'),
@@ -150,32 +163,64 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // Quick stats display
-  Widget _buildQuickStats(BuildContext context) {
+  /// Quick stats display
+  Widget _buildQuickStats(
+    BuildContext context,
+    AsyncValue<int> todayCount,
+    AsyncValue<int> streak,
+  ) {
     return Row(
       children: [
         Expanded(
-          child: _buildStatCard(
-            context,
-            title: AppStrings.todaySessions,
-            value: '0',
-            icon: Icons.check_circle_outline,
+          child: todayCount.when(
+            data: (count) => _buildStatCard(
+              context,
+              title: AppStrings.todaySessions,
+              value: count.toString(),
+              icon: Icons.check_circle_outline,
+            ),
+            loading: () => _buildStatCard(
+              context,
+              title: AppStrings.todaySessions,
+              value: '...',
+              icon: Icons.check_circle_outline,
+            ),
+            error: (_, __) => _buildStatCard(
+              context,
+              title: AppStrings.todaySessions,
+              value: '0',
+              icon: Icons.check_circle_outline,
+            ),
           ),
         ),
         const SizedBox(width: 12),
         Expanded(
-          child: _buildStatCard(
-            context,
-            title: AppStrings.currentStreak,
-            value: '0',
-            icon: Icons.local_fire_department_outlined,
+          child: streak.when(
+            data: (streakValue) => _buildStatCard(
+              context,
+              title: AppStrings.currentStreak,
+              value: streakValue.toString(),
+              icon: Icons.local_fire_department_outlined,
+            ),
+            loading: () => _buildStatCard(
+              context,
+              title: AppStrings.currentStreak,
+              value: '...',
+              icon: Icons.local_fire_department_outlined,
+            ),
+            error: (_, __) => _buildStatCard(
+              context,
+              title: AppStrings.currentStreak,
+              value: '0',
+              icon: Icons.local_fire_department_outlined,
+            ),
           ),
         ),
       ],
     );
   }
 
-  // Individual stat card
+  /// Individual stat card
   Widget _buildStatCard(
     BuildContext context, {
     required String title,

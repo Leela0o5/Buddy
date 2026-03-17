@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/widgets/base_scaffold.dart';
 import '../../../../config/constants.dart';
+import '../state/timer_provider.dart';
 
 // Active focus session timer screen
-class TimerScreen extends StatefulWidget {
+class TimerScreen extends ConsumerStatefulWidget {
   final int durationMinutes;
 
   const TimerScreen({
@@ -12,25 +14,30 @@ class TimerScreen extends StatefulWidget {
   }) : super(key: key);
 
   @override
-  State<TimerScreen> createState() => _TimerScreenState();
+  ConsumerState<TimerScreen> createState() => _TimerScreenState();
 }
 
-class _TimerScreenState extends State<TimerScreen> {
-  late int _remainingSeconds;
-  bool _isRunning = false;
+class _TimerScreenState extends ConsumerState<TimerScreen> {
   bool _isPaused = false;
 
   @override
-  void initState() {
-    super.initState();
-    _remainingSeconds = widget.durationMinutes * 60;
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final minutes = _remainingSeconds ~/ 60;
-    final seconds = _remainingSeconds % 60;
-    final timeString = '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+    final currentSession = ref.watch(currentSessionProvider);
+    ref.watch(timerStreamProvider);
+
+    if (currentSession == null) {
+      return const Scaffold(
+        body: Center(child: Text('Starting session...')),
+      );
+    }
+
+    final remainingSeconds = currentSession.remainingSeconds;
+    final elapsedSeconds = currentSession.elapsedSeconds;
+
+    final minutes = remainingSeconds ~/ 60;
+    final seconds = remainingSeconds % 60;
+    final timeString =
+        '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
 
     return BaseScaffold(
       title: AppStrings.focusSession,
@@ -43,7 +50,7 @@ class _TimerScreenState extends State<TimerScreen> {
           const SizedBox(height: 40),
 
           // Time visualization
-          _buildTimeVisualization(context),
+          _buildTimeVisualization(context, elapsedSeconds),
           const SizedBox(height: 40),
 
           // Control buttons
@@ -85,10 +92,11 @@ class _TimerScreenState extends State<TimerScreen> {
     );
   }
 
-  // Progress visualization - Time passing indicator
-  Widget _buildTimeVisualization(BuildContext context) {
-    final progress = 1 - (_remainingSeconds / (widget.durationMinutes * 60));
-    final elapsedMinutes = (widget.durationMinutes * 60 - _remainingSeconds) ~/ 60;
+  //  Time passing indicator
+  Widget _buildTimeVisualization(BuildContext context, int elapsedSeconds) {
+    final totalSeconds = widget.durationMinutes * 60;
+    final progress = elapsedSeconds / totalSeconds;
+    final elapsedMinutes = elapsedSeconds ~/ 60;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -101,7 +109,7 @@ class _TimerScreenState extends State<TimerScreen> {
         ClipRRect(
           borderRadius: BorderRadius.circular(8),
           child: LinearProgressIndicator(
-            value: progress,
+            value: progress.clamp(0.0, 1.0),
             minHeight: 8,
             backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.2),
             valueColor: AlwaysStoppedAnimation(
@@ -115,6 +123,8 @@ class _TimerScreenState extends State<TimerScreen> {
 
   // Control buttons (pause/resume/cancel)
   Widget _buildControlButtons(BuildContext context) {
+    final timerService = ref.watch(timerServiceProvider);
+
     return Row(
       children: [
         // Pause/Resume button
@@ -122,12 +132,20 @@ class _TimerScreenState extends State<TimerScreen> {
           child: FilledButton.icon(
             onPressed: () {
               setState(() {
-                _isRunning = !_isRunning;
                 _isPaused = !_isPaused;
               });
+              if (_isPaused) {
+                timerService.pause();
+              } else {
+                timerService.resume();
+              }
             },
             icon: Icon(_isPaused ? Icons.play_arrow : Icons.pause),
-            label: Text(_isPaused ? AppStrings.resumeSession : AppStrings.pauseSession),
+            label: Text(
+              _isPaused
+                  ? AppStrings.resumeSession
+                  : AppStrings.pauseSession,
+            ),
           ),
         ),
         const SizedBox(width: 12),
@@ -147,6 +165,12 @@ class _TimerScreenState extends State<TimerScreen> {
 
   // Session info card
   Widget _buildSessionInfo(BuildContext context) {
+    final currentSession = ref.watch(currentSessionProvider);
+
+    if (currentSession == null) {
+      return const SizedBox.shrink();
+    }
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -161,7 +185,7 @@ class _TimerScreenState extends State<TimerScreen> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '${widget.durationMinutes}m',
+                  '${currentSession.durationMinutes}m',
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
               ],
@@ -169,12 +193,12 @@ class _TimerScreenState extends State<TimerScreen> {
             Column(
               children: [
                 Text(
-                  'Status',
+                  'Distractions',
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  _isRunning ? (_isPaused ? 'Paused' : 'Running') : 'Ready',
+                  '${currentSession.distractionsCount}',
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
               ],
@@ -199,6 +223,8 @@ class _TimerScreenState extends State<TimerScreen> {
           ),
           TextButton(
             onPressed: () {
+              ref.read(currentSessionProvider.notifier).abandonSession();
+              ref.read(timerServiceProvider).stop();
               Navigator.pop(context);
               Navigator.pop(context); // Exit timer screen
             },
