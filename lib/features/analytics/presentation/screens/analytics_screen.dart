@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/widgets/base_scaffold.dart';
 import '../../../../config/constants.dart';
 import '../state/analytics_provider.dart';
+import 'session_history_screen.dart';
+import 'reflection_journal_screen.dart';
 
 // Analytics and insights dashboard
 class AnalyticsScreen extends ConsumerWidget {
@@ -40,8 +42,61 @@ class AnalyticsScreen extends ConsumerWidget {
 
             // Insights section
             _buildInsightsSection(context, ref),
+            const SizedBox(height: 32),
+
+            // Navigation to history and journal
+            _buildNavigationSection(context),
           ],
         ),
+      ),
+    );
+  }
+
+  // Navigation section
+  Widget _buildNavigationSection(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'More',
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const SessionHistoryScreen(),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.history),
+                  label: const Text('History'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const ReflectionJournalScreen(),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.note_outlined),
+                  label: const Text('Journal'),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+        ],
       ),
     );
   }
@@ -334,7 +389,7 @@ class AnalyticsScreen extends ConsumerWidget {
               ? _buildWarningCard(
                   context,
                   icon: Icons.warning,
-                  title: '⚠️ Burnout Risk',
+                  title: ' Burnout Risk',
                   description:
                       'You\'ve completed 4+ sessions in 2 hours. Take a break!',
                 )
