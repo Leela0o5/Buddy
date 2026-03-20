@@ -32,7 +32,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
               value: _darkModeEnabled,
               onChanged: (value) {
                 setState(() => _darkModeEnabled = value);
-                // TODO: Day 13 - Wire to Riverpod theme provider
               },
             ),
             const Divider(),

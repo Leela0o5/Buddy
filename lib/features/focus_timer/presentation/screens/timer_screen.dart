@@ -6,8 +6,11 @@ import '../../../../core/services/haptic_service.dart';
 import '../../../../core/services/timer_service.dart';
 import '../../../../core/models/focus_session.dart';
 import '../state/timer_provider.dart';
+import '../state/distraction_provider.dart';
 import '../widgets/circular_timer_widget.dart';
 import '../widgets/reward_animation_widget.dart';
+import '../../../../core/services/notification_service.dart';
+import '../widgets/time_blindness_widget.dart';
 
 // Active focus session timer screen
 class TimerScreen extends ConsumerStatefulWidget {
@@ -26,6 +29,16 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
   bool _isPaused = false;
   bool _sessionComplete = false;
   int _lastMinute = 0;
+  int _lastRecordedDistractionCount = 0;
+
+   @override
+  void initState() {
+    super.initState();
+    // Initialize notifications
+    Future.microtask(() async {
+      await NotificationService().initialize();
+    });
+  }
 
   void _defer(void Function() action) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -40,11 +53,26 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
     final currentSession = ref.watch(currentSessionProvider);
     final elapsedSecondsFromStream =
         ref.watch(timerStreamProvider).asData?.value;
+    final distractionCountFromStream =
+        ref.watch(distractionStreamProvider).asData?.value;
 
     if (currentSession == null) {
       return const Scaffold(
         body: Center(child: Text('Starting session...')),
       );
+    }
+
+    // Update distraction count when a new distraction is detected
+    if (distractionCountFromStream != null &&
+        distractionCountFromStream != _lastRecordedDistractionCount) {
+      _lastRecordedDistractionCount = distractionCountFromStream;
+      _defer(() {
+        ref
+            .read(currentSessionProvider.notifier)
+            .recordDistraction();
+        debugPrint(
+            ' Distraction recorded in session! Total: ${currentSession.distractionsCount + 1}');
+      });
     }
 
     if (elapsedSecondsFromStream != null &&
@@ -135,36 +163,18 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
     );
   }
 
-  // Progress visualization - Time passing indicator
+    /// Time visualization with encouragement
   Widget _buildTimeVisualization(
     BuildContext context,
     FocusSession currentSession,
   ) {
     final totalSeconds = currentSession.durationMinutes * 60;
     final elapsedSeconds = totalSeconds - currentSession.remainingSeconds;
-    final progress = elapsedSeconds / totalSeconds;
     final elapsedMinutes = elapsedSeconds ~/ 60;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          '${AppStrings.youHaveBeenFocusing} $elapsedMinutes ${elapsedMinutes == 1 ? 'minute' : 'minutes'}',
-          style: Theme.of(context).textTheme.bodyMedium,
-        ),
-        const SizedBox(height: 12),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(8),
-          child: LinearProgressIndicator(
-            value: progress.clamp(0.0, 1.0),
-            minHeight: 8,
-            backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.2),
-            valueColor: AlwaysStoppedAnimation(
-              Theme.of(context).colorScheme.primary,
-            ),
-          ),
-        ),
-      ],
+    return TimeBlindnessWidget(
+      elapsedMinutes: elapsedMinutes,
+      totalMinutes: currentSession.durationMinutes,
     );
   }
 

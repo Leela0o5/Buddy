@@ -1,15 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/services/hive_service.dart';
+import 'core/services/notification_service.dart';
 import 'app.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize Hive for local storage
-  await HiveService().initialize();
+  try {
+    // Initialize Hive for local storage
+    await HiveService().initialize();
+  } catch (e) {
+    debugPrint('Error initializing Hive: $e');
+  }
 
-  // Initialize local notifications later
+  try {
+    // Initialize local notifications
+    await NotificationService().initialize();
+  } catch (e) {
+    debugPrint('Error initializing notifications: $e');
+  }
 
   runApp(
     const ProviderScope(
