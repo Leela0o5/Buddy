@@ -16,17 +16,28 @@ class TimerService {
   /// Start the timer
   void start(int durationSeconds) {
     if (_isRunning) return;
+    _timer?.cancel();
 
     _totalSeconds = durationSeconds;
     _elapsedSeconds = 0;
     _isRunning = true;
+    _elapsedStreamController.add(_elapsedSeconds);
+    _startTicker();
+  }
 
-    _timer = Timer.periodic(const Duration(milliseconds: 100), (_) {
-      _elapsedSeconds += 1; // Increment by 1 sec every 100ms
+  void _startTicker() {
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!_isRunning) return;
+      _elapsedSeconds += 1;
       if (_elapsedSeconds > _totalSeconds) {
         _elapsedSeconds = _totalSeconds;
       }
       _elapsedStreamController.add(_elapsedSeconds);
+
+      if (_elapsedSeconds >= _totalSeconds) {
+        _timer?.cancel();
+        _isRunning = false;
+      }
     });
   }
 
@@ -39,7 +50,9 @@ class TimerService {
   // Resume the timer
   void resume() {
     if (_isRunning) return;
-    start(_totalSeconds - _elapsedSeconds);
+    if (_totalSeconds <= 0) return;
+    _isRunning = true;
+    _startTicker();
   }
 
   // Stop and reset the timer

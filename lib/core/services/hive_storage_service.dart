@@ -42,7 +42,7 @@ class HiveStorageService implements StorageService {
     try {
       final box = _getFocusSessionBox();
       final data = box.get(id);
-      return data != null ? _deserializeFocusSession(data) : null;
+      return data != null ? _deserializeFocusSession(_asStringDynamicMap(data)) : null;
     } catch (e) {
       debugPrint('Error getting focus session: $e');
       return null;
@@ -54,7 +54,7 @@ class HiveStorageService implements StorageService {
     try {
       final box = _getFocusSessionBox();
       return box.values
-          .map((data) => _deserializeFocusSession(data))
+          .map((data) => _deserializeFocusSession(_asStringDynamicMap(data)))
           .toList();
     } catch (e) {
       debugPrint('Error getting all focus sessions: $e');
@@ -89,7 +89,7 @@ class HiveStorageService implements StorageService {
     try {
       final box = _getTaskBox();
       final data = box.get(id);
-      return data != null ? _deserializeTask(data) : null;
+      return data != null ? _deserializeTask(_asStringDynamicMap(data)) : null;
     } catch (e) {
       debugPrint('Error getting task: $e');
       return null;
@@ -100,7 +100,9 @@ class HiveStorageService implements StorageService {
   Future<List<Task>> getAllTasks() async {
     try {
       final box = _getTaskBox();
-      return box.values.map((data) => _deserializeTask(data)).toList();
+      return box.values
+          .map((data) => _deserializeTask(_asStringDynamicMap(data)))
+          .toList();
     } catch (e) {
       debugPrint('Error getting all tasks: $e');
       return [];
@@ -134,7 +136,7 @@ class HiveStorageService implements StorageService {
     try {
       final box = _getReflectionBox();
       final data = box.get(id);
-      return data != null ? _deserializeEnergyLog(data) : null;
+      return data != null ? _deserializeEnergyLog(_asStringDynamicMap(data)) : null;
     } catch (e) {
       debugPrint('Error getting energy log: $e');
       return null;
@@ -145,7 +147,9 @@ class HiveStorageService implements StorageService {
   Future<List<EnergyLog>> getAllEnergyLogs() async {
     try {
       final box = _getReflectionBox();
-      return box.values.map((data) => _deserializeEnergyLog(data)).toList();
+      return box.values
+          .map((data) => _deserializeEnergyLog(_asStringDynamicMap(data)))
+          .toList();
     } catch (e) {
       debugPrint('Error getting all energy logs: $e');
       return [];
@@ -157,7 +161,7 @@ class HiveStorageService implements StorageService {
     try {
       final box = _getReflectionBox();
       final allLogs = box.values
-          .map((data) => _deserializeEnergyLog(data))
+          .map((data) => _deserializeEnergyLog(_asStringDynamicMap(data)))
           .toList();
       return allLogs.where((log) => log.sessionId == sessionId).toList();
     } catch (e) {
@@ -183,7 +187,7 @@ class HiveStorageService implements StorageService {
     try {
       final box = _getPreferencesBox();
       final data = box.get('user_prefs');
-      return data != null ? _deserializePreferences(data) : null;
+      return data != null ? _deserializePreferences(_asStringDynamicMap(data)) : null;
     } catch (e) {
       debugPrint('Error getting preferences: $e');
       return null;
@@ -201,6 +205,16 @@ class HiveStorageService implements StorageService {
   }
 
   // Convert domain models to JSON-compatible Maps for storage
+
+  Map<String, dynamic> _asStringDynamicMap(dynamic raw) {
+    if (raw is Map<String, dynamic>) return raw;
+    if (raw is Map) {
+      return Map<String, dynamic>.from(raw.map(
+        (key, value) => MapEntry(key.toString(), value),
+      ));
+    }
+    throw StateError('Expected a Map but got ${raw.runtimeType}');
+  }
 
   Map<String, dynamic> _serializeFocusSession(FocusSession session) {
     return {
@@ -251,12 +265,16 @@ class HiveStorageService implements StorageService {
   Task _deserializeTask(Map<String, dynamic> data) {
     final subtasksData = (data['subtasks'] as List<dynamic>? ?? []);
     final subtasks = subtasksData
-        .map((s) => Subtask(
-              id: s['id'] ?? '',
-              title: s['title'] ?? '',
-              completed: s['completed'] ?? false,
-              createdAt: DateTime.parse(s['createdAt'] ?? DateTime.now().toIso8601String()),
-            ))
+        .map((s) {
+          final subtask = _asStringDynamicMap(s);
+          return Subtask(
+              id: subtask['id'] ?? '',
+              title: subtask['title'] ?? '',
+              completed: subtask['completed'] ?? false,
+              createdAt: DateTime.parse(
+                  subtask['createdAt'] ?? DateTime.now().toIso8601String()),
+            );
+        })
         .toList();
 
     return Task(

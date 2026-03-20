@@ -2,7 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/widgets/base_scaffold.dart';
 import '../../../../config/constants.dart';
+import '../../../../core/services/haptic_service.dart';
+import '../../../../core/services/timer_service.dart';
+import '../../../../core/models/focus_session.dart';
 import '../state/timer_provider.dart';
+import '../widgets/circular_timer_widget.dart';
+import '../widgets/reward_animation_widget.dart';
 
 // Active focus session timer screen
 class TimerScreen extends ConsumerStatefulWidget {
@@ -19,11 +24,22 @@ class TimerScreen extends ConsumerStatefulWidget {
 
 class _TimerScreenState extends ConsumerState<TimerScreen> {
   bool _isPaused = false;
+  bool _sessionComplete = false;
+  int _lastMinute = 0;
+
+  void _defer(void Function() action) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      action();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
+    final timerService = ref.watch(timerServiceProvider);
     final currentSession = ref.watch(currentSessionProvider);
-    ref.watch(timerStreamProvider);
+    final elapsedSecondsFromStream =
+        ref.watch(timerStreamProvider).asData?.value;
 
     if (currentSession == null) {
       return const Scaffold(
@@ -31,70 +47,101 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
       );
     }
 
-    final remainingSeconds = currentSession.remainingSeconds;
-    final elapsedSeconds = currentSession.elapsedSeconds;
+    if (elapsedSecondsFromStream != null &&
+        elapsedSecondsFromStream != currentSession.elapsedSeconds) {
+      _defer(() {
+        ref
+            .read(currentSessionProvider.notifier)
+            .updateElapsedTime(elapsedSecondsFromStream);
+      });
+    }
 
-    final minutes = remainingSeconds ~/ 60;
-    final seconds = remainingSeconds % 60;
-    final timeString =
-        '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+    final remainingSeconds = currentSession.remainingSeconds;
+
+    // Trigger haptic every minute
+    if (remainingSeconds > 0 && _lastMinute != remainingSeconds ~/ 60) {
+      _lastMinute = remainingSeconds ~/ 60;
+      HapticService.lightVibration();
+    }
+
+    // Check if session is complete
+    if (remainingSeconds <= 0 && !_sessionComplete) {
+      _defer(() {
+        setState(() {
+          _sessionComplete = true;
+        });
+        HapticService.successVibration();
+        timerService.stop();
+        ref.read(currentSessionProvider.notifier).completeSession();
+
+        // Save session to storage
+        final session = ref.read(currentSessionProvider);
+        if (session != null) {
+          ref.read(focusSessionRepositoryProvider).save(session);
+        }
+      });
+    }
 
     return BaseScaffold(
       title: AppStrings.focusSession,
-      body: Column(
-        children: [
-          const SizedBox(height: 40),
-
-          // Large countdown timer
-          _buildTimerDisplay(context, timeString),
-          const SizedBox(height: 40),
-
-          // Time visualization
-          _buildTimeVisualization(context, elapsedSeconds),
-          const SizedBox(height: 40),
-
-          // Control buttons
-          _buildControlButtons(context),
-          const SizedBox(height: 40),
-
-          // Session info
-          _buildSessionInfo(context),
-        ],
-      ),
+      body: _sessionComplete
+          ? _buildRewardScreen(context)
+          : _buildTimerScreen(context, timerService, currentSession,
+              remainingSeconds),
     );
   }
 
-  // Large countdown display
-  Widget _buildTimerDisplay(BuildContext context, String timeString) {
-    return Center(
-      child: Container(
-        width: 240,
-        height: 240,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
-          border: Border.all(
-            color: Theme.of(context).colorScheme.primary,
-            width: 4,
-          ),
-        ),
-        child: Center(
-          child: Text(
-            timeString,
-            style: Theme.of(context).textTheme.displayLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 72,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-          ),
-        ),
-      ),
+  /// Reward screen after completion
+  Widget _buildRewardScreen(BuildContext context) {
+    return RewardAnimationWidget(
+      onComplete: () {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Moving to reflection...')),
+        );
+      },
     );
   }
 
-  //  Time passing indicator
-  Widget _buildTimeVisualization(BuildContext context, int elapsedSeconds) {
-    final totalSeconds = widget.durationMinutes * 60;
+  // Active timer screen
+  Widget _buildTimerScreen(
+    BuildContext context,
+    TimerService timerService,
+    FocusSession currentSession,
+    int remainingSeconds,
+  ) {
+    return Column(
+      children: [
+        const SizedBox(height: 20),
+
+        // Circular timer animation
+        CircularTimerWidget(
+          remainingSeconds: remainingSeconds,
+          totalSeconds: currentSession.durationMinutes * 60,
+          isRunning: timerService.isRunning,
+        ),
+        const SizedBox(height: 40),
+
+        // Time visualization
+        _buildTimeVisualization(context, currentSession),
+        const SizedBox(height: 40),
+
+        // Control buttons
+        _buildControlButtons(context, timerService),
+        const SizedBox(height: 40),
+
+        // Session info
+        _buildSessionInfo(context, currentSession),
+      ],
+    );
+  }
+
+  // Progress visualization - Time passing indicator
+  Widget _buildTimeVisualization(
+    BuildContext context,
+    FocusSession currentSession,
+  ) {
+    final totalSeconds = currentSession.durationMinutes * 60;
+    final elapsedSeconds = totalSeconds - currentSession.remainingSeconds;
     final progress = elapsedSeconds / totalSeconds;
     final elapsedMinutes = elapsedSeconds ~/ 60;
 
@@ -122,15 +169,14 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
   }
 
   // Control buttons (pause/resume/cancel)
-  Widget _buildControlButtons(BuildContext context) {
-    final timerService = ref.watch(timerServiceProvider);
-
+  Widget _buildControlButtons(BuildContext context, TimerService timerService) {
     return Row(
       children: [
         // Pause/Resume button
         Expanded(
           child: FilledButton.icon(
             onPressed: () {
+              HapticService.lightVibration();
               setState(() {
                 _isPaused = !_isPaused;
               });
@@ -153,7 +199,8 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
         Expanded(
           child: OutlinedButton.icon(
             onPressed: () {
-              _showCancelDialog(context);
+              HapticService.warningVibration();
+              _showCancelDialog(context, timerService);
             },
             icon: const Icon(Icons.close),
             label: const Text(AppStrings.cancelSession),
@@ -164,13 +211,7 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
   }
 
   // Session info card
-  Widget _buildSessionInfo(BuildContext context) {
-    final currentSession = ref.watch(currentSessionProvider);
-
-    if (currentSession == null) {
-      return const SizedBox.shrink();
-    }
-
+  Widget _buildSessionInfo(BuildContext context, FocusSession currentSession) {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -210,7 +251,7 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
   }
 
   // Cancel session confirmation dialog
-  void _showCancelDialog(BuildContext context) {
+  void _showCancelDialog(BuildContext context, TimerService timerService) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -224,7 +265,7 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
           TextButton(
             onPressed: () {
               ref.read(currentSessionProvider.notifier).abandonSession();
-              ref.read(timerServiceProvider).stop();
+              timerService.stop();
               Navigator.pop(context);
               Navigator.pop(context); // Exit timer screen
             },

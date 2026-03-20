@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/widgets/base_scaffold.dart';
 import '../../../../config/constants.dart';
 import '../state/timer_provider.dart';
+import 'timer_screen.dart';
 
 // Home screen with focus timer selector and quick stats
 class HomeScreen extends ConsumerWidget {
@@ -126,11 +127,10 @@ class HomeScreen extends ConsumerWidget {
               // Start session with selected duration
               ref.read(currentSessionProvider.notifier).startSession(selectedDuration);
               ref.read(timerServiceProvider).start(selectedDuration * 60);
-              
-              // TODO: Navigate to timer screen (Day 4)
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Starting $selectedDuration min session...'),
+
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => TimerScreen(durationMinutes: selectedDuration),
                 ),
               );
             },
@@ -148,10 +148,10 @@ class HomeScreen extends ConsumerWidget {
               // Start 5-min quick session
               ref.read(currentSessionProvider.notifier).startSession(5);
               ref.read(timerServiceProvider).start(5 * 60);
-              
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Starting 5 min quick session...'),
+
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const TimerScreen(durationMinutes: 5),
                 ),
               );
             },
