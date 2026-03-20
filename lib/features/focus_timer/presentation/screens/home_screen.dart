@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/widgets/base_scaffold.dart';
 import '../../../../config/constants.dart';
 import '../state/timer_provider.dart';
+import '../widgets/start_small_button_widget.dart';
 import 'timer_screen.dart';
 
 // Home screen with focus timer selector and quick stats
@@ -139,31 +140,25 @@ class HomeScreen extends ConsumerWidget {
           ),
         ),
         const SizedBox(height: 12),
-        // Start Small Mode alternative
+        // Start Small Mode with dedicated widget
         SizedBox(
           width: double.infinity,
           height: AppConstants.largeButtonHeight,
-          child: OutlinedButton.icon(
-            onPressed: () {
-              // Start 5-min quick session
-              ref.read(currentSessionProvider.notifier).startSession(5);
-              ref.read(timerServiceProvider).start(5 * 60);
-
+          child: StartSmallButtonWidget(
+            onStarted: () {
               Navigator.of(context).push(
                 MaterialPageRoute(
                   builder: (_) => const TimerScreen(durationMinutes: 5),
                 ),
               );
             },
-            icon: const Icon(Icons.flash_on),
-            label: const Text(AppStrings.startSmallMode),
           ),
         ),
       ],
     );
   }
 
-  /// Quick stats display
+  // Quick stats display
   Widget _buildQuickStats(
     BuildContext context,
     AsyncValue<int> todayCount,
@@ -220,7 +215,7 @@ class HomeScreen extends ConsumerWidget {
     );
   }
 
-  /// Individual stat card
+  // Individual stat card
   Widget _buildStatCard(
     BuildContext context, {
     required String title,

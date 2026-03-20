@@ -103,27 +103,27 @@ class TaskCardWidget extends ConsumerWidget {
                         : Theme.of(context).colorScheme.error,
                   ),
             ),
-            if (task.subtasks.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: LinearProgressIndicator(
-                    value: task.subtaskProgress,
-                    minHeight: 6,
-                    backgroundColor: Theme.of(context)
-                        .colorScheme
-                        .primary
-                        .withOpacity(0.2),
-                    valueColor: AlwaysStoppedAnimation(
-                      Theme.of(context).colorScheme.primary,
-                    ),
-                  ),
-                ),
-              ),
           ],
         ),
         children: [
+          if (task.subtasks.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: LinearProgressIndicator(
+                  value: task.subtaskProgress,
+                  minHeight: 6,
+                  backgroundColor: Theme.of(context)
+                      .colorScheme
+                      .primary
+                      .withOpacity(0.2),
+                  valueColor: AlwaysStoppedAnimation(
+                    Theme.of(context).colorScheme.primary,
+                  ),
+                ),
+              ),
+            ),
           if ((task.description ?? '').trim().isNotEmpty)
             Align(
               alignment: Alignment.centerLeft,
