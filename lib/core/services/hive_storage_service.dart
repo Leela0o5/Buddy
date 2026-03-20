@@ -330,6 +330,7 @@ class HiveStorageService implements StorageService {
       'soundEnabled': prefs.soundEnabled,
       'notificationsEnabled': prefs.notificationsEnabled,
       'notificationHour': prefs.notificationHour,
+      'notificationMinute': prefs.notificationMinute,
       'lastUpdated': prefs.lastUpdated.toIso8601String(),
     };
   }
@@ -341,6 +342,7 @@ class HiveStorageService implements StorageService {
       soundEnabled: data['soundEnabled'] ?? false,
       notificationsEnabled: data['notificationsEnabled'] ?? true,
       notificationHour: data['notificationHour'] ?? 9,
+      notificationMinute: data['notificationMinute'] ?? 0,
       lastUpdated: DateTime.parse(data['lastUpdated'] ?? DateTime.now().toIso8601String()),
     );
   }

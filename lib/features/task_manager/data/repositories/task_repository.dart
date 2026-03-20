@@ -75,9 +75,15 @@ class TaskRepository {
   // Toggle task completion
   Future<void> toggleCompletion(Task task) async {
     try {
+      final nextCompleted = !task.completed;
+      final updatedSubtasks = task.subtasks
+          .map((subtask) => subtask.copyWith(completed: nextCompleted))
+          .toList();
+
       final updated = task.copyWith(
-        completed: !task.completed,
-        completedAt: !task.completed ? DateTime.now() : null,
+        subtasks: updatedSubtasks,
+        completed: nextCompleted,
+        completedAt: nextCompleted ? DateTime.now() : null,
       );
       await save(updated);
     } catch (e) {
@@ -88,7 +94,14 @@ class TaskRepository {
   // Toggle subtask completion
   Future<void> toggleSubtask(Task task, String subtaskId) async {
     try {
-      final updated = task.toggleSubtask(subtaskId);
+      final toggled = task.toggleSubtask(subtaskId);
+      final allDone =
+          toggled.subtasks.isNotEmpty && toggled.subtasks.every((s) => s.completed);
+
+      final updated = toggled.copyWith(
+        completed: allDone,
+        completedAt: allDone ? DateTime.now() : null,
+      );
       await save(updated);
     } catch (e) {
       rethrow;

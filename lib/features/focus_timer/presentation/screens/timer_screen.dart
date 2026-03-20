@@ -3,10 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/widgets/base_scaffold.dart';
 import '../../../../config/constants.dart';
 import '../../../../core/services/haptic_service.dart';
+import '../../../../core/services/sound_service.dart';
 import '../../../../core/services/timer_service.dart';
 import '../../../../core/models/focus_session.dart';
 import '../state/timer_provider.dart';
 import '../state/distraction_provider.dart';
+import '../../../settings/presentation/state/preferences_provider.dart';
 import '../widgets/circular_timer_widget.dart';
 import '../widgets/reward_animation_widget.dart';
 import '../../../../core/services/notification_service.dart';
@@ -57,6 +59,9 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
         ref.watch(timerStreamProvider).asData?.value;
     final distractionCountFromStream =
         ref.watch(distractionStreamProvider).asData?.value;
+    final hapticsEnabled = ref.watch(vibrationEnabledProvider);
+    final soundsEnabled = ref.watch(soundEnabledProvider);
+    final notificationsEnabled = ref.watch(notificationsEnabledProvider);
 
     if (currentSession == null) {
       return const Scaffold(
@@ -72,6 +77,9 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
         ref
             .read(currentSessionProvider.notifier)
             .recordDistraction();
+        if (notificationsEnabled) {
+          NotificationService().showDistractionAlert();
+        }
         debugPrint(
             ' Distraction recorded in session! Total: ${currentSession.distractionsCount + 1}');
       });
@@ -91,7 +99,12 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
     // Trigger haptic every minute
     if (remainingSeconds > 0 && _lastMinute != remainingSeconds ~/ 60) {
       _lastMinute = remainingSeconds ~/ 60;
-      HapticService.lightVibration();
+      if (hapticsEnabled) {
+        HapticService.lightVibration();
+      }
+      if (soundsEnabled) {
+        SoundService.click();
+      }
     }
 
     // Check if session is complete
@@ -100,7 +113,15 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
         setState(() {
           _sessionComplete = true;
         });
-        HapticService.successVibration();
+        if (hapticsEnabled) {
+          HapticService.successVibration();
+        }
+        if (soundsEnabled) {
+          SoundService.alert();
+        }
+        if (notificationsEnabled) {
+          NotificationService().showEncouragement('Great work completing your focus session.');
+        }
         timerService.stop();
         ref.read(currentSessionProvider.notifier).completeSession();
 
@@ -117,8 +138,14 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
       title: AppStrings.focusSession,
       body: _sessionComplete
           ? _buildRewardScreen(context)
-          : _buildTimerScreen(context, timerService, currentSession,
-              remainingSeconds),
+          : _buildTimerScreen(
+              context,
+              timerService,
+              currentSession,
+              remainingSeconds,
+              hapticsEnabled,
+              soundsEnabled,
+            ),
     );
   }
 
@@ -145,6 +172,8 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
     TimerService timerService,
     FocusSession currentSession,
     int remainingSeconds,
+    bool hapticsEnabled,
+    bool soundsEnabled,
   ) {
     return Column(
       children: [
@@ -163,7 +192,12 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
         const SizedBox(height: 40),
 
         // Control buttons
-        _buildControlButtons(context, timerService),
+        _buildControlButtons(
+          context,
+          timerService,
+          hapticsEnabled,
+          soundsEnabled,
+        ),
         const SizedBox(height: 40),
 
         // Session info
@@ -188,14 +222,24 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
   }
 
   // Control buttons (pause/resume/cancel)
-  Widget _buildControlButtons(BuildContext context, TimerService timerService) {
+  Widget _buildControlButtons(
+    BuildContext context,
+    TimerService timerService,
+    bool hapticsEnabled,
+    bool soundsEnabled,
+  ) {
     return Row(
       children: [
         // Pause/Resume button
         Expanded(
           child: FilledButton.icon(
             onPressed: () {
-              HapticService.lightVibration();
+              if (hapticsEnabled) {
+                HapticService.lightVibration();
+              }
+              if (soundsEnabled) {
+                SoundService.click();
+              }
               setState(() {
                 _isPaused = !_isPaused;
               });
@@ -218,7 +262,12 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
         Expanded(
           child: OutlinedButton.icon(
             onPressed: () {
-              HapticService.warningVibration();
+              if (hapticsEnabled) {
+                HapticService.warningVibration();
+              }
+              if (soundsEnabled) {
+                SoundService.alert();
+              }
               _showCancelDialog(context, timerService);
             },
             icon: const Icon(Icons.close),
