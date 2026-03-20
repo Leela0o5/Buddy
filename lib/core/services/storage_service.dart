@@ -23,6 +23,7 @@ abstract class StorageService {
   Future<EnergyLog?> getEnergyLog(String id);
   Future<List<EnergyLog>> getAllEnergyLogs();
   Future<List<EnergyLog>> getEnergyLogsForSession(String sessionId);
+  Future<void> deleteEnergyLog(String id);
 
   // Preferences
   Future<void> savePreferences(UserPreferences prefs);

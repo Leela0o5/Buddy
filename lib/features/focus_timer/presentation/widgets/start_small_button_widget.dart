@@ -44,7 +44,7 @@ class StartSmallButtonWidget extends ConsumerWidget {
             // Start 5-minute quick session
             ref.read(currentSessionProvider.notifier).startSession(5);
             ref.read(timerServiceProvider).start(5 * 60);
-            ref.read(activateStartSmallProvider(null));
+            ref.read(activateStartSmallProvider)(null);
             onStarted?.call();
           },
           icon: const Icon(Icons.flash_on, size: 20),

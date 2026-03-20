@@ -11,6 +11,7 @@ import '../widgets/circular_timer_widget.dart';
 import '../widgets/reward_animation_widget.dart';
 import '../../../../core/services/notification_service.dart';
 import '../widgets/time_blindness_widget.dart';
+import '../../../reflection/presentation/screens/reflection_screen.dart';
 
 // Active focus session timer screen
 class TimerScreen extends ConsumerStatefulWidget {
@@ -28,6 +29,7 @@ class TimerScreen extends ConsumerStatefulWidget {
 class _TimerScreenState extends ConsumerState<TimerScreen> {
   bool _isPaused = false;
   bool _sessionComplete = false;
+  FocusSession? _completedSession;
   int _lastMinute = 0;
   int _lastRecordedDistractionCount = 0;
 
@@ -105,6 +107,7 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
         // Save session to storage
         final session = ref.read(currentSessionProvider);
         if (session != null) {
+          _completedSession = session;
           ref.read(focusSessionRepositoryProvider).save(session);
         }
       });
@@ -123,9 +126,15 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
   Widget _buildRewardScreen(BuildContext context) {
     return RewardAnimationWidget(
       onComplete: () {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Moving to reflection...')),
-        );
+        if (_completedSession != null) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (_) => ReflectionScreen(
+                completedSession: _completedSession!,
+              ),
+            ),
+          );
+        }
       },
     );
   }

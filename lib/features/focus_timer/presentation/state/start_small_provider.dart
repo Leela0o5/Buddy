@@ -3,18 +3,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 // Provider for Start Small Mode state
 final startSmallModeProvider = StateProvider<bool>((ref) => false);
 
-// Provider to activate Start Small Mode with optional duration
-final activateStartSmallProvider =
-    FutureProvider.family.autoDispose<void, int?>(
-  (ref, customDuration) async {
-    // Set Start Small mode to active
+// Trigger Start Small visual state without mutating providers during provider build.
+typedef StartSmallActivator = Future<void> Function(int? customDuration);
+
+final activateStartSmallProvider = Provider<StartSmallActivator>((ref) {
+  return (int? customDuration) async {
     ref.read(startSmallModeProvider.notifier).state = true;
 
-    // Reset after 2 seconds (visual indication)
+    // Brief pulse animation to indicate Start Small was activated.
     await Future.delayed(const Duration(milliseconds: 500));
     ref.read(startSmallModeProvider.notifier).state = false;
-  },
-);
+  };
+});
 
 // Get the recommended Start Small duration
 final recommendedStartSmallDurationProvider = Provider<int>((ref) {

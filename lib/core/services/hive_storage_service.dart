@@ -171,6 +171,17 @@ class HiveStorageService implements StorageService {
   }
 
   @override
+  Future<void> deleteEnergyLog(String id) async {
+    try {
+      final box = _getReflectionBox();
+      await box.delete(id);
+    } catch (e) {
+      debugPrint('Error deleting energy log: $e');
+      rethrow;
+    }
+  }
+
+  @override
   Future<void> savePreferences(UserPreferences prefs) async {
     try {
       final box = _getPreferencesBox();
