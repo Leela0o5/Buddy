@@ -8,6 +8,7 @@ class BaseScaffold extends StatelessWidget {
   final FloatingActionButton? floatingActionButton;
   final PreferredSizeWidget? appBar;
   final bool showAppBar;
+  final bool isScrollable;
   final Color? backgroundColor;
   final List<Widget>? actions;
 
@@ -18,6 +19,7 @@ class BaseScaffold extends StatelessWidget {
     this.floatingActionButton,
     this.appBar,
     this.showAppBar = true,
+    this.isScrollable = true,
     this.backgroundColor,
     this.actions,
   }) : super(key: key);
@@ -35,13 +37,18 @@ class BaseScaffold extends StatelessWidget {
               )
           : null,
       body: SafeArea(
-        child: SingleChildScrollView(
-          physics: const ClampingScrollPhysics(),
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: body,
-          ),
-        ),
+        child: isScrollable
+            ? SingleChildScrollView(
+                physics: const ClampingScrollPhysics(),
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: body,
+                ),
+              )
+            : Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: body,
+              ),
       ),
       floatingActionButton: floatingActionButton,
     );
