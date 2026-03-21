@@ -13,7 +13,7 @@ import '../widgets/circular_timer_widget.dart';
 import '../widgets/reward_animation_widget.dart';
 import '../../../../core/services/notification_service.dart';
 import '../widgets/time_blindness_widget.dart';
-import '../../../reflection/presentation/screens/reflection_screen.dart';
+import 'break_screen.dart';
 
 // Active focus session timer screen
 class TimerScreen extends ConsumerStatefulWidget {
@@ -31,7 +31,6 @@ class TimerScreen extends ConsumerStatefulWidget {
 class _TimerScreenState extends ConsumerState<TimerScreen> {
   bool _isPaused = false;
   bool _sessionComplete = false;
-  FocusSession? _completedSession;
   int _lastMinute = 0;
   int _lastRecordedDistractionCount = 0;
 
@@ -128,8 +127,9 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
         // Save session to storage
         final session = ref.read(currentSessionProvider);
         if (session != null) {
-          _completedSession = session;
           ref.read(focusSessionRepositoryProvider).save(session);
+          // Invalidate today's sessions provider so cycle display updates
+          ref.invalidate(todaySessionsProvider);
         }
       });
     }
@@ -153,17 +153,118 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
   Widget _buildRewardScreen(BuildContext context) {
     return RewardAnimationWidget(
       onComplete: () {
-        if (_completedSession != null) {
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(
-              builder: (_) => ReflectionScreen(
-                completedSession: _completedSession!,
-              ),
-            ),
-          );
-        }
+        // Show continue/break options
+        _showPostSessionOptions(context);
       },
     );
+  }
+
+  void _showPostSessionOptions(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Session Complete! 🎉'),
+        content: const Text('What would you like to do?'),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(dialogContext); // Close dialog
+              // Reset session and go home
+              ref.read(currentSessionProvider.notifier).resetSession();
+              ref.read(timerServiceProvider).stop();
+              Navigator.pop(context); // Go back to home
+            },
+            child: const Text('Go Home'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(dialogContext);
+              // Get break duration based on session count
+              final breakDuration = await ref.read(breakDurationProvider.future);
+              
+              if (context.mounted) {
+                // Show break screen on top of timer 
+                // So Skip button can return to timer screen
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => BreakScreen(
+                      breakDurationMinutes: breakDuration,
+                      onBreakComplete: () {
+                        // After break, ask if they want to continue
+                        _showContinueSessionDialog(context);
+                      },
+                      onSkip: () {
+                        // Auto-continue session after skipping break
+                        Navigator.pop(context); // Close break screen
+                        _continueSession(context);
+                      },
+                    ),
+                  ),
+                );
+              }
+            },
+            child: const Text('Take Break'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              // Continue without break
+              _continueSession(context);
+            },
+            child: const Text('Continue'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showContinueSessionDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Ready to continue?'),
+        content: const Text('Start another focus session?'),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              Navigator.pop(context); // Go to home
+            },
+            child: const Text('Rest more'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              _continueSession(context);
+            },
+            child: const Text('Continue'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _continueSession(BuildContext context) {
+    // Exit all dialogs and get back to home
+    Navigator.of(context).popUntil((route) => route.isFirst);
+    
+    Future.microtask(() {
+      ref.read(currentSessionProvider.notifier).resetSession();
+      ref.read(timerServiceProvider).stop();
+      
+      // Start new session with selected duration
+      final duration = ref.read(selectedDurationProvider);
+      ref.read(currentSessionProvider.notifier).startSession(duration);
+      ref.read(timerServiceProvider).start(duration * 60);
+      
+      // Push new timer screen
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => TimerScreen(durationMinutes: duration),
+        ),
+      );
+    });
   }
 
   // Active timer screen
@@ -228,51 +329,103 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
     bool hapticsEnabled,
     bool soundsEnabled,
   ) {
-    return Row(
+    final currentSession = ref.watch(currentSessionProvider);
+    final canAdjust = !timerService.isRunning && 
+        currentSession != null && 
+        currentSession.elapsedSeconds == 0;
+
+    return Column(
       children: [
-        // Pause/Resume button
-        Expanded(
-          child: FilledButton.icon(
-            onPressed: () {
-              if (hapticsEnabled) {
-                HapticService.lightVibration();
-              }
-              if (soundsEnabled) {
-                SoundService.click();
-              }
-              setState(() {
-                _isPaused = !_isPaused;
-              });
-              if (_isPaused) {
-                timerService.pause();
-              } else {
-                timerService.resume();
-              }
-            },
-            icon: Icon(_isPaused ? Icons.play_arrow : Icons.pause),
-            label: Text(
-              _isPaused
-                  ? AppStrings.resumeSession
-                  : AppStrings.pauseSession,
+        // Duration adjustment buttons (only when at start)
+        if (canAdjust)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                IconButton(
+                  onPressed: () {
+                    final duration = currentSession.durationMinutes;
+                    if (duration > 5) {
+                      final newDuration = duration - 5;
+                      ref.read(currentSessionProvider.notifier).adjustDuration(newDuration);
+                      ref.read(selectedDurationProvider.notifier).state = newDuration;
+                      if (hapticsEnabled) HapticService.lightVibration();
+                    }
+                  },
+                  icon: const Icon(Icons.remove_circle),
+                  tooltip: 'Decrease time',
+                ),
+                const SizedBox(width: 16),
+                Text(
+                  '${currentSession.durationMinutes} min',
+                  style: Theme.of(context).textTheme.headlineSmall,
+                ),
+                const SizedBox(width: 16),
+                IconButton(
+                  onPressed: () {
+                    final duration = currentSession.durationMinutes;
+                    if (duration < 25) {
+                      final newDuration = duration + 5;
+                      ref.read(currentSessionProvider.notifier).adjustDuration(newDuration);
+                      ref.read(selectedDurationProvider.notifier).state = newDuration;
+                      if (hapticsEnabled) HapticService.lightVibration();
+                    }
+                  },
+                  icon: const Icon(Icons.add_circle),
+                  tooltip: 'Increase time',
+                ),
+              ],
             ),
           ),
-        ),
-        const SizedBox(width: 12),
-        // Cancel button
-        Expanded(
-          child: OutlinedButton.icon(
-            onPressed: () {
-              if (hapticsEnabled) {
-                HapticService.warningVibration();
-              }
-              if (soundsEnabled) {
-                SoundService.alert();
-              }
-              _showCancelDialog(context, timerService);
-            },
-            icon: const Icon(Icons.close),
-            label: const Text(AppStrings.cancelSession),
-          ),
+        // Pause/Resume and Cancel buttons
+        Row(
+          children: [
+            // Pause/Resume button
+            Expanded(
+              child: FilledButton.icon(
+                onPressed: () {
+                  if (hapticsEnabled) {
+                    HapticService.lightVibration();
+                  }
+                  if (soundsEnabled) {
+                    SoundService.click();
+                  }
+                  setState(() {
+                    _isPaused = !_isPaused;
+                  });
+                  if (_isPaused) {
+                    timerService.pause();
+                  } else {
+                    timerService.resume();
+                  }
+                },
+                icon: Icon(_isPaused ? Icons.play_arrow : Icons.pause),
+                label: Text(
+                  _isPaused
+                      ? AppStrings.resumeSession
+                      : AppStrings.pauseSession,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            // Cancel button
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  if (hapticsEnabled) {
+                    HapticService.warningVibration();
+                  }
+                  if (soundsEnabled) {
+                    SoundService.alert();
+                  }
+                  _showCancelDialog(context, timerService);
+                },
+                icon: const Icon(Icons.close),
+                label: const Text(AppStrings.cancelSession),
+              ),
+            ),
+          ],
         ),
       ],
     );
@@ -280,6 +433,8 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
 
   // Session info card
   Widget _buildSessionInfo(BuildContext context, FocusSession currentSession) {
+    final todaySessionsAsync = ref.watch(todaySessionsProvider);
+    
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -312,6 +467,26 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
                 ),
               ],
             ),
+            Column(
+              children: [
+                Text(
+                  'Cycle',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                const SizedBox(height: 4),
+                todaySessionsAsync.when(
+                  data: (sessions) {
+                    final positionInCycle = (sessions.length % 4) + 1;
+                    return Text(
+                      '$positionInCycle/4',
+                      style: Theme.of(context).textTheme.titleLarge,
+                    );
+                  },
+                  loading: () => const Text('-'),
+                  error: (_, __) => const Text('?'),
+                ),
+              ],
+            ),
           ],
         ),
       ),
@@ -334,6 +509,7 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
             onPressed: () {
               ref.read(currentSessionProvider.notifier).abandonSession();
               timerService.stop();
+              ref.read(currentSessionProvider.notifier).resetSession();
               Navigator.pop(context);
               Navigator.pop(context); // Exit timer screen
             },

@@ -7,6 +7,7 @@ import 'app.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+
   try {
     // Initialize Hive for local storage
     await HiveService().initialize();
@@ -20,6 +21,7 @@ void main() async {
   } catch (e) {
     debugPrint('Error initializing notifications: $e');
   }
+
 
   runApp(
     const ProviderScope(

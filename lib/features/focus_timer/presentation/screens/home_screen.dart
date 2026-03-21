@@ -85,6 +85,8 @@ class HomeScreen extends ConsumerWidget {
     WidgetRef ref,
     int selectedDuration,
   ) {
+    final isSessionActive = ref.watch(isSessionActiveProvider);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -93,20 +95,35 @@ class HomeScreen extends ConsumerWidget {
           style: Theme.of(context).textTheme.titleLarge,
         ),
         const SizedBox(height: 12),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: AppConstants.allSessionDurations.map((duration) {
-            final isSelected = selectedDuration == duration;
-            return ChoiceChip(
-              label: Text('${duration}m'),
-              selected: isSelected,
-              onSelected: (selected) {
-                ref.read(selectedDurationProvider.notifier).state = duration;
-              },
-            );
-          }).toList(),
+        Opacity(
+          opacity: isSessionActive ? 0.5 : 1.0,
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: AppConstants.allSessionDurations.map((duration) {
+              final isSelected = selectedDuration == duration;
+              return ChoiceChip(
+                label: Text('${duration}m'),
+                selected: isSelected,
+                onSelected: isSessionActive
+                    ? null
+                    : (selected) {
+                        ref.read(selectedDurationProvider.notifier).state = duration;
+                      },
+              );
+            }).toList(),
+          ),
         ),
+        if (isSessionActive)
+          Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: Text(
+              'Duration locked during active session',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Colors.grey,
+                  ),
+            ),
+          ),
       ],
     );
   }
@@ -117,42 +134,88 @@ class HomeScreen extends ConsumerWidget {
     WidgetRef ref,
     int selectedDuration,
   ) {
+    final isSessionActive = ref.watch(isSessionActiveProvider);
+
     return Column(
       children: [
+        if (isSessionActive)
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.orange.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.orange),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.info, color: Colors.orange),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Session in progress. Complete or cancel it first.',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         // Main start button
         SizedBox(
           width: double.infinity,
           height: AppConstants.largeButtonHeight,
           child: FilledButton.icon(
-            onPressed: () {
-              // Start session with selected duration
-              ref.read(currentSessionProvider.notifier).startSession(selectedDuration);
-              ref.read(timerServiceProvider).start(selectedDuration * 60);
+            onPressed: isSessionActive
+                ? null
+                : () {
+                    // Start session with selected duration
+                    ref.read(currentSessionProvider.notifier).startSession(selectedDuration);
+                    ref.read(timerServiceProvider).start(selectedDuration * 60);
 
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => TimerScreen(durationMinutes: selectedDuration),
-                ),
-              );
-            },
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => TimerScreen(durationMinutes: selectedDuration),
+                      ),
+                    );
+                  },
             icon: const Icon(Icons.play_arrow),
             label: const Text(AppStrings.startFocus),
           ),
         ),
         const SizedBox(height: 12),
-        // Start Small Mode with dedicated widget
+        // Start Small Mode or View Active Timer
         SizedBox(
           width: double.infinity,
           height: AppConstants.largeButtonHeight,
-          child: StartSmallButtonWidget(
-            onStarted: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => const TimerScreen(durationMinutes: 5),
+          child: isSessionActive
+              ? FilledButton.icon(
+                  onPressed: () {
+                    // Go back to active timer
+                    final currentSession = ref.read(currentSessionProvider);
+                    if (currentSession != null) {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => TimerScreen(
+                            durationMinutes: currentSession.durationMinutes,
+                          ),
+                        ),
+                      );
+                    }
+                  },
+                  icon: const Icon(Icons.timer),
+                  label: const Text('View Active Timer'),
+                )
+              : StartSmallButtonWidget(
+                  onStarted: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const TimerScreen(durationMinutes: 5),
+                      ),
+                    );
+                  },
                 ),
-              );
-            },
-          ),
         ),
       ],
     );

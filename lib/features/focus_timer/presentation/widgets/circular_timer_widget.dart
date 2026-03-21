@@ -14,8 +14,11 @@ class CircularTimerWidget extends StatelessWidget {
     required this.isRunning,
   }) : super(key: key);
 
-  // Calculate progress (0 - 1)
-  double get progress => (totalSeconds - remainingSeconds) / totalSeconds;
+  // Calculate progress (0 - 1), clamped to ensure it reaches 100%
+  double get progress {
+    final calculatedProgress = (totalSeconds - remainingSeconds) / totalSeconds;
+    return calculatedProgress.clamp(0.0, 1.0);
+  }
 
   // Calculate color based on time remaining 
   Color _getProgressColor(BuildContext context) {
